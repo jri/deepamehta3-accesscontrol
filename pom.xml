@@ -5,7 +5,7 @@
     <name>DeepaMehta 3 Access Control</name>
     <groupId>de.deepamehta</groupId>
     <artifactId>deepamehta3-accesscontrol</artifactId>
-    <version>0.4.3-SNAPSHOT</version>
+    <version>0.4-SNAPSHOT</version>
     <packaging>bundle</packaging>
 
     <parent>
@@ -31,7 +31,7 @@
                 <configuration>
                     <instructions>
                         <Bundle-Activator>
-                            de.deepamehta.core.service.Plugin
+                            de.deepamehta.plugins.accesscontrol.AccessControlPlugin
                         </Bundle-Activator>
                     </instructions>
                 </configuration>

@@ -1,6 +1,6 @@
 
-DeepaMehta 3 Accounts Plugin
-============================
+DeepaMehta 3 Access Control Plugin
+==================================
 
 Restricts access to DeepaMehta 3 by putting a login dialog at application start.
 Accounts can be created and modified by the user. One account is pre-configured.

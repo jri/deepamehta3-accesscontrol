@@ -7,7 +7,7 @@ function dm3_accesscontrol() {
     dm3c.css_stylesheet("/de.deepamehta.3-accesscontrol/style/dm3-accesscontrol.css")
     dm3c.javascript_source("/de.deepamehta.3-accesscontrol/script/vendor/sha256.js")
 
-    var logged_in_user
+    var logged_in_user      // a topic of type "de/deepamehta/core/topictype/user"
 
     // ------------------------------------------------------------------------------------------------------ Public API
 
@@ -21,7 +21,7 @@ function dm3_accesscontrol() {
 
     this.init = function() {
 
-        create_default_user()
+        // create_default_user()
         create_login_dialog()
 
         function create_default_user() {
@@ -69,6 +69,8 @@ function dm3_accesscontrol() {
                     // restore close box of the other dialogs
                     $(".ui-dialog-titlebar-close").show()
                 })
+                //
+                dm3c.set_cookie("username", username)
             } else {
                 show_message("Login failed", "login-failed")
             }
