@@ -1,13 +1,15 @@
 package de.deepamehta.plugins.accesscontrol;
 
 import de.deepamehta.core.model.DataField;
+import de.deepamehta.core.model.RelatedTopic;
 import de.deepamehta.core.model.Topic;
 import de.deepamehta.core.model.TopicType;
 import de.deepamehta.core.service.Plugin;
 import de.deepamehta.core.util.JavaUtils;
 
-import java.util.Date;
+import static java.util.Arrays.asList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 
@@ -73,6 +75,18 @@ public class AccessControlPlugin extends Plugin {
         dms.createRelation("CREATOR", topic.id, user.id, null);
     }
 
+    @Override
+    public void preUpdateHook(Topic topic, Map<String, Object> newProperties) {
+        // encrypt password of new users
+        if (topic.typeUri.equals("de/deepamehta/core/topictype/user")) {
+            // we recognize a new user (or changed password) if password doesn't begin with ENCRYPTED_PASSWORD_PREFIX
+            String password = (String) newProperties.get("de/deepamehta/core/property/password");
+            if (!password.startsWith(ENCRYPTED_PASSWORD_PREFIX)) {
+                newProperties.put("de/deepamehta/core/property/password", encryptPassword(password));
+            }
+        }
+    }
+
     /**
      * Adds "Creator" data field to all topic types.
      */
@@ -87,11 +101,61 @@ public class AccessControlPlugin extends Plugin {
         topicType.addDataField(creatorField);
     }
 
+    @Override
+    public void provideAuxiliaryHook(Topic topic, Map<String, String> clientContext) {
+        Topic user = getUser(clientContext);
+        Topic creator = getCreator(topic.id);
+        //
+        boolean writePermission = user != null && creator != null && user.id == creator.id;
+        //
+        Map acl = new HashMap();
+        acl.put("write", writePermission);
+        topic.setAuxiliary("permissions", acl);
+    }
+
     // ------------------------------------------------------------------------------------------------- Private Methods
 
+    /**
+     * Returns the user that is represented by the client context, or <code>null</code> if no user is logged in.
+     */
+    private Topic getUser(Map<String, String> clientContext) {
+        if (clientContext == null) {    // some callers to dms.getTopic() doesn't pass a client context
+            return null;
+        }
+        String username = clientContext.get("username");
+        if (username == null) {
+            return null;
+        }
+        return getUser(username);
+    }
+
+    /**
+     * Returns the user (topic) by username, or <code>null</code> if no such user exists.
+     */
     private Topic getUser(String username) {
         return dms.getTopic("de/deepamehta/core/property/username", username);
     }
+
+    // ---
+
+    /**
+     * Returns the creator (a user topic) of a topic, or <code>null</code> if no creator exists.
+     */
+    private Topic getCreator(long topicId) {
+        List<RelatedTopic> users = dms.getRelatedTopics(topicId,
+            asList("de/deepamehta/core/topictype/user"),
+            asList("CREATOR;INCOMING"), null);
+        //
+        if (users.size() == 0) {
+            return null;
+        } else if (users.size() > 1) {
+            throw new RuntimeException("Ambiguity: topic " + topicId + " has " + users.size() + " creators");
+        }
+        //
+        return users.get(0).getTopic();
+    }
+
+    // ---
 
     private String encryptPassword(String password) {
         return ENCRYPTED_PASSWORD_PREFIX + JavaUtils.encodeSHA256(password);

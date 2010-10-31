@@ -83,6 +83,10 @@ function dm3_accesscontrol() {
         }
     }
 
+    this.has_write_permission = function(topic) {
+        return topic.permissions.write
+    }
+
     /* this.pre_create = function(doc) {
         // Note: topics and relations might get created programatically,
         // e.g. by other plugins, before the user has logged in.
