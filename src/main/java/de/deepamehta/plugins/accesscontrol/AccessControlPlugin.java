@@ -53,22 +53,20 @@ public class AccessControlPlugin extends Plugin {
             return;
         }
         // check precondition 2
-        String username = clientContext.get("username");
+        String username = clientContext.get("dm3_username");
         if (username == null) {
-            logger.warning(topic + " can't be related to a user because current user is unknown " +
-                "(no setting found in client context)");
+            logger.warning(topic + " can't be related to a user (no one is logged in)");
             return;
         }
         // check precondition 3
         Topic user = getUser(username);
         if (user == null) {
-            logger.warning(topic + " can't be related to a user because user \"" + username + "\" doesn't exist");
+            logger.warning(topic + " can't be related to a user (user \"" + username + "\" doesn't exist)");
             return;
         }
         // check precondition 4
         if (topic.id == user.id) {
-            logger.warning(topic + " can't be related to user \"" + username +
-                "\" because the topic is the user itself!");
+            logger.warning(topic + " can't be related to user \"" + username + "\" (the topic is the user itself!)");
             return;
         }
         // relate topic to workspace
@@ -122,7 +120,7 @@ public class AccessControlPlugin extends Plugin {
         if (clientContext == null) {    // some callers to dms.getTopic() doesn't pass a client context
             return null;
         }
-        String username = clientContext.get("username");
+        String username = clientContext.get("dm3_username");
         if (username == null) {
             return null;
         }
