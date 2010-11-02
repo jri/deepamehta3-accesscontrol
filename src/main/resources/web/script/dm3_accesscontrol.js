@@ -88,8 +88,14 @@ function dm3_accesscontrol() {
         }
     }
 
+    // ---
+
     this.has_write_permission = function(topic) {
         return topic.permissions.write
+    }
+
+    this.has_create_permission = function(topic_type) {
+        return topic_type.permissions.create
     }
 
     // ----------------------------------------------------------------------------------------------- Private Functions

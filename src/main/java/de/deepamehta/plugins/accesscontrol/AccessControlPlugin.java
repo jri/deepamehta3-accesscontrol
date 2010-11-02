@@ -37,10 +37,7 @@ public class AccessControlPlugin extends Plugin {
 
     @Override
     public void evokePluginHook() {
-        Map properties = new HashMap();
-        properties.put("de/deepamehta/core/property/username", DEFAULT_USER);
-        properties.put("de/deepamehta/core/property/password", encryptPassword(DEFAULT_PASSWORD));
-        dms.createTopic("de/deepamehta/core/topictype/user", properties, null);     // clientContext=null
+        createDefaultUser();
     }
 
     // Note: we must use the postCreateHook to create the relation because at pre_create the document has no ID yet.
@@ -69,8 +66,8 @@ public class AccessControlPlugin extends Plugin {
             logger.warning(topic + " can't be related to user \"" + username + "\" (the topic is the user itself!)");
             return;
         }
-        // relate topic to workspace
-        dms.createRelation("CREATOR", topic.id, user.id, null);
+        //
+        setCreator(topic.id, user.id);
     }
 
     @Override
@@ -85,33 +82,49 @@ public class AccessControlPlugin extends Plugin {
         }
     }
 
-    /**
-     * Adds "Creator" data field to all topic types.
-     */
     @Override
     public void modifyTopicTypeHook(TopicType topicType) {
+        addCreatorFieldToType(topicType);
+        initCreatorOfType(topicType);
+    }
+
+    // ---
+
+    @Override
+    public void enrichTopicHook(Topic topic, Map<String, String> clientContext) {
+        Topic user = getUser(clientContext);
+        Topic creator = getCreator(topic.id);
+        // very simple policy for now
+        boolean writePermission = user != null && creator != null && user.id == creator.id;
         //
-        DataField creatorField = new DataField("Creator", "reference");
-        creatorField.setUri("de/deepamehta/core/property/creator");
-        creatorField.setRelatedTypeUri("de/deepamehta/core/topictype/user");
-        creatorField.setEditor("checkboxes");
-        //
-        topicType.addDataField(creatorField);
+        Map permissions = new HashMap();
+        permissions.put("write", writePermission);
+        topic.setEnrichment("permissions", permissions);
     }
 
     @Override
-    public void provideAuxiliaryHook(Topic topic, Map<String, String> clientContext) {
+    public void enrichTopicTypeHook(TopicType topicType, Map<String, String> clientContext) {
         Topic user = getUser(clientContext);
-        Topic creator = getCreator(topic.id);
-        //
+        Topic creator = getCreator(topicType.id);
+        // very simple policy for now
         boolean writePermission = user != null && creator != null && user.id == creator.id;
         //
-        Map acl = new HashMap();
-        acl.put("write", writePermission);
-        topic.setAuxiliary("permissions", acl);
+        Map permissions = new HashMap();
+        permissions.put("write", writePermission);
+        permissions.put("create", writePermission);
+        topicType.setEnrichment("permissions", permissions);
     }
 
     // ------------------------------------------------------------------------------------------------- Private Methods
+
+    private void createDefaultUser() {
+        Map properties = new HashMap();
+        properties.put("de/deepamehta/core/property/username", DEFAULT_USER);
+        properties.put("de/deepamehta/core/property/password", encryptPassword(DEFAULT_PASSWORD));
+        dms.createTopic("de/deepamehta/core/topictype/user", properties, null);     // clientContext=null
+    }
+
+    // ---
 
     /**
      * Returns the user that is represented by the client context, or <code>null</code> if no user is logged in.
@@ -157,5 +170,24 @@ public class AccessControlPlugin extends Plugin {
 
     private String encryptPassword(String password) {
         return ENCRYPTED_PASSWORD_PREFIX + JavaUtils.encodeSHA256(password);
+    }
+
+    // ---
+
+    private void addCreatorFieldToType(TopicType topicType) {
+        DataField creatorField = new DataField("Creator", "reference");
+        creatorField.setUri("de/deepamehta/core/property/creator");
+        creatorField.setRelatedTypeUri("de/deepamehta/core/topictype/user");
+        creatorField.setEditor("checkboxes");
+        //
+        topicType.addDataField(creatorField);
+    }
+
+    private void initCreatorOfType(TopicType topicType) {
+        setCreator(topicType.id, getUser(DEFAULT_USER).id);
+    }
+
+    private void setCreator(long topicId, long userId) {
+        dms.createRelation("CREATOR", topicId, userId, null);
     }
 }
