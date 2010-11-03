@@ -65,8 +65,7 @@ function dm3_accesscontrol() {
                     })
                 })
                 //
-                js.set_cookie("dm3_username", username)
-                dm3c.ui.set_menu_item_label("special-menu", "loginout-item", "Logout \"" + get_username() + "\"")
+                login(username)
             } else {
                 show_message("Login failed", "login-failed")
             }
@@ -83,8 +82,7 @@ function dm3_accesscontrol() {
         if (label == "Login...") {
             $("#login-dialog").dialog("open")
         } else if (label == "Logout \"" + get_username() + "\"") {
-            js.remove_cookie("dm3_username")
-            dm3c.ui.set_menu_item_label("special-menu", "loginout-item", "Login...")
+            logout()
         }
     }
 
@@ -100,12 +98,37 @@ function dm3_accesscontrol() {
 
     // ----------------------------------------------------------------------------------------------- Private Functions
 
+    function login(username) {
+        js.set_cookie("dm3_username", username)
+        dm3c.ui.set_menu_item_label("special-menu", "loginout-item", "Logout \"" + get_username() + "\"")
+        //
+        adjust_create_widget()
+    }
+
+    function logout() {
+        js.remove_cookie("dm3_username")
+        dm3c.ui.set_menu_item_label("special-menu", "loginout-item", "Login...")
+        //
+        adjust_create_widget()
+    }
+
+    // ---
+
+    function adjust_create_widget() {
+        dm3c.reload_types()
+        var menu = dm3c.recreate_type_menu("create-type-menu")
+        if (menu.get_item_count()) {
+            $("#create-widget").show()
+        } else {
+            $("#create-widget").hide()
+        }
+    }
+
+    // ---
+
     function lookup_user(username, password) {
         var user = dm3c.restc.get_topic_by_property("de/deepamehta/core/property/username", username)
-        if (!user) {
-            return
-        }
-        if (user.properties["de/deepamehta/core/property/password"] == encrypt_password(password)) {
+        if (user && user.properties["de/deepamehta/core/property/password"] == encrypt_password(password)) {
             return user
         }
     }
