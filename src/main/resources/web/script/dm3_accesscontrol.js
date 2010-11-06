@@ -96,6 +96,8 @@ function dm3_accesscontrol() {
         return topic_type.permissions.create
     }
 
+
+
     // ----------------------------------------------------------------------------------------------- Private Functions
 
     function login(username) {
@@ -103,6 +105,8 @@ function dm3_accesscontrol() {
         dm3c.ui.set_menu_item_label("special-menu", "loginout-item", "Logout \"" + get_username() + "\"")
         //
         adjust_create_widget()
+        //
+        dm3c.trigger_hook("user_logged_in")
     }
 
     function logout() {
@@ -110,6 +114,8 @@ function dm3_accesscontrol() {
         dm3c.ui.set_menu_item_label("special-menu", "loginout-item", "Login...")
         //
         adjust_create_widget()
+        //
+        dm3c.trigger_hook("user_logged_out")
     }
 
     // ---
