@@ -36,7 +36,7 @@ public class AccessControlPlugin extends Plugin {
 
 
     @Override
-    public void evokePluginHook() {
+    public void postInstallPluginHook() {
         createDefaultUser();
     }
 
