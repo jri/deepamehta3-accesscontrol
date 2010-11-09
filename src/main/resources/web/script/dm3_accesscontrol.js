@@ -41,10 +41,7 @@ function dm3_accesscontrol() {
             $("#login-message-container").height($("#login-message").height())
             $("#login-dialog").dialog({
                 title: "Login", buttons: {"OK": do_login},
-                modal: true, autoOpen: false, closeOnEscape: false, draggable: false, resizable: false,
-                open: function() {
-                    $(".ui-dialog-titlebar-close").hide()
-                }
+                modal: true, autoOpen: false, closeOnEscape: true, draggable: false, resizable: false
             })
         }
 
@@ -60,8 +57,6 @@ function dm3_accesscontrol() {
                         $("#login-username").val("")
                         $("#login-password").val("")
                         $("#login-message").text("")
-                        // restore close box of the other dialogs
-                        $(".ui-dialog-titlebar-close").show()
                     })
                 })
                 //
