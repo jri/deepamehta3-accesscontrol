@@ -72,32 +72,14 @@ public class AccessControlPlugin extends Plugin {
     // Note: we must use the postCreateHook to create the relation because at pre_create the document has no ID yet.
     @Override
     public void postCreateHook(Topic topic, Map<String, String> clientContext) {
-        // check precondition 1
-        if (clientContext == null) {
-            logger.warning(topic + " can't be related to a user because current user is unknown " +
-                "(client context is not initialzed)");
-            return;
-        }
-        // check precondition 2
-        String username = clientContext.get("dm3_username");
-        if (username == null) {
-            logger.warning(topic + " can't be related to a user (no one is logged in)");
-            return;
-        }
-        // check precondition 3
-        Topic user = getUser(username);
-        if (user == null) {
-            logger.warning(topic + " can't be related to a user (user \"" + username + "\" doesn't exist)");
-            return;
-        }
-        // check precondition 4
+        /* check precondition 4
         if (topic.id == user.id) {
             logger.warning(topic + " can't be related to user \"" + username + "\" (the topic is the user itself!)");
             return;
-        }
+        }*/
         //
-        setCreator(topic.id, user.id);
-        setACLEntry(topic.id, Role.CREATOR);
+        setCreator(topic, clientContext);
+        createACLEntry(topic.id, Role.CREATOR);
     }
 
     @Override
@@ -113,9 +95,11 @@ public class AccessControlPlugin extends Plugin {
     }
 
     @Override
-    public void modifyTopicTypeHook(TopicType topicType) {
+    public void modifyTopicTypeHook(TopicType topicType, Map<String, String> clientContext) {
         addCreatorFieldToType(topicType);
-        initCreatorOfType(topicType);
+        //
+        setCreator(topicType, clientContext);
+        createACLEntry(topicType.id, Role.CREATOR);
     }
 
     // ---
@@ -187,6 +171,14 @@ public class AccessControlPlugin extends Plugin {
         return dms.getTopic("de/deepamehta/core/property/username", username);
     }
 
+    private Topic getAdminUser() {
+        Topic user = getUser(DEFAULT_USER);
+        if (user == null) {
+            throw new RuntimeException("The \"" + DEFAULT_USER + "\" user doesn't exist");
+        }
+        return user;
+    }
+
     // ---
 
     private String encryptPassword(String password) {
@@ -204,24 +196,31 @@ public class AccessControlPlugin extends Plugin {
         topicType.addDataField(creatorField);
     }
 
-    private void initCreatorOfType(TopicType topicType) {
-        setCreator(topicType.id, getUser(DEFAULT_USER).id);
+    // ---
+
+    private void setCreator(Topic topic, Map<String, String> clientContext) {
+        Topic user = getUser(clientContext);
+        if (user == null) {
+            logger.warning("### There is no current user. The admin user is set as the creator of " + topic);
+            user = getAdminUser();
+        }
+        setCreator(topic.id, user.id);
     }
 
     private void setCreator(long topicId, long userId) {
         dms.createRelation("CREATOR", topicId, userId, null);
     }
 
-    // === ACL ===
+    // === ACL Entries ===
 
-    private void setACLEntry(long topicId, Role role) {
-        dms.createRelation("ACCESS_CONTROL", topicId, getRole(role).id, creatorACL);
+    private void createACLEntry(long topicId, Role role) {
+        dms.createRelation("ACCESS_CONTROL", topicId, getRoleTopic(role).id, creatorACL);
     }
 
-    private Topic getRole(Role role) {
+    private Topic getRoleTopic(Role role) {
         Topic roleTopic = dms.getTopic("de/deepamehta/core/property/rolename", role.s());
         if (roleTopic == null) {
-            throw new RuntimeException("Role topic \"" + role.s() + "\" doesn't exist in database");
+            throw new RuntimeException("Role topic \"" + role.s() + "\" doesn't exist");
         }
         return roleTopic;
     }
@@ -231,21 +230,28 @@ public class AccessControlPlugin extends Plugin {
     private boolean hasPermission(Topic topic, Topic user, Permission permission) {
         String roleName = null;
         try {
+            logger.fine("Determine permission of user " + user + " to " + permission + " " + topic);
             for (RelatedTopic relTopic : getACLEntries(topic.id)) {
                 roleName = (String) relTopic.getTopic().getProperty("de/deepamehta/core/property/rolename");
                 Role role = Role.valueOf(roleName.toUpperCase());   // throws IllegalArgumentException
+                logger.fine("There is an ACL entry for role " + role);
                 if (role.equals(Role.EVERYONE)) {
                     boolean perm = (Boolean) relTopic.getRelation().getProperty(permission.s());
+                    logger.fine("value=" + perm);
                     if (perm) {
                         // everyone has permission
+                        logger.fine("=> ALLOWED");
                         return true;
                     }
                 } else if (role.equals(Role.CREATOR)) {
                     boolean perm = (Boolean) relTopic.getRelation().getProperty(permission.s());
+                    logger.fine("value=" + perm);
                     if (perm) {
                         // the creator has permission -- check if the user is the creator
                         Topic creator = getCreator(topic.id);
+                        logger.fine("The creator is " + creator);
                         if (user != null && creator != null && user.id == creator.id) {
+                            logger.fine("=> ALLOWED");
                             return true;
                         }
                     }
@@ -253,6 +259,7 @@ public class AccessControlPlugin extends Plugin {
                     throw new RuntimeException("Role \"" + role + "\" not yet handled");
                 }
             }
+            logger.fine("=> DENIED");
             return false;
         } catch (IllegalArgumentException e) {
             throw new RuntimeException("Unexpected role \"" + roleName + "\" in ACL entry for " + topic, e);
