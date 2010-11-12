@@ -24,7 +24,7 @@ public class AccessControlPlugin extends Plugin {
 
     // ---------------------------------------------------------------------------------------------- Instance Variables
 
-    private enum Role {
+    public enum Role {
 
         CREATOR, EVERYONE;
         
@@ -139,6 +139,20 @@ public class AccessControlPlugin extends Plugin {
         topicType.setEnrichment("permissions", permissions);
     }
 
+
+
+    // ******************
+    // *** Public API ***
+    // ******************
+
+
+
+    public void createACLEntry(long topicId, Role role) {
+        dms.createRelation("ACCESS_CONTROL", topicId, getRoleTopic(role).id, creatorACL);
+    }
+
+
+
     // ------------------------------------------------------------------------------------------------- Private Methods
 
     private void createDefaultUser() {
@@ -213,10 +227,6 @@ public class AccessControlPlugin extends Plugin {
 
     // === ACL Entries ===
 
-    private void createACLEntry(long topicId, Role role) {
-        dms.createRelation("ACCESS_CONTROL", topicId, getRoleTopic(role).id, creatorACL);
-    }
-
     private Topic getRoleTopic(Role role) {
         Topic roleTopic = dms.getTopic("de/deepamehta/core/property/rolename", role.s());
         if (roleTopic == null) {
@@ -269,7 +279,7 @@ public class AccessControlPlugin extends Plugin {
     // ---
 
     private List<RelatedTopic> getACLEntries(long topicId) {
-        return dms.getRelatedTopics(topicId,
+        return getService().getRelatedTopics(topicId,
             asList("de/deepamehta/core/topictype/role"),
             asList("ACCESS_CONTROL;INCOMING"), null);
     }

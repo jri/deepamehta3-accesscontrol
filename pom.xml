@@ -5,7 +5,7 @@
     <name>DeepaMehta 3 Access Control</name>
     <groupId>de.deepamehta</groupId>
     <artifactId>deepamehta3-accesscontrol</artifactId>
-    <version>0.4-SNAPSHOT</version>
+    <version>${accesscontrol-version}</version>
     <packaging>bundle</packaging>
 
     <parent>
