@@ -1,4 +1,4 @@
-function dm3_accesscontrol() {
+function accesscontrol_plugin() {
 
     var DEFAULT_USER = "admin"
     var DEFAULT_PASSWORD = ""
@@ -7,7 +7,9 @@ function dm3_accesscontrol() {
     dm3c.css_stylesheet("/de.deepamehta.3-accesscontrol/style/dm3-accesscontrol.css")
     dm3c.javascript_source("/de.deepamehta.3-accesscontrol/script/vendor/sha256.js")
 
-    // ------------------------------------------------------------------------------------------------------ Public API
+    var self = this
+
+    // -------------------------------------------------------------------------------------------------- Public Methods
 
 
 
@@ -19,13 +21,9 @@ function dm3_accesscontrol() {
 
     this.init = function() {
 
-        if (get_username()) {
-            dm3c.add_to_special_menu({value: "loginout-item", label: "Logout \"" + get_username() + "\""})
-        } else {
-            dm3c.add_to_special_menu({value: "loginout-item", label: "Login..."})
-        }
-
+        dm3c.add_to_special_menu({value: "loginout-item", label: menu_item_label()})
         create_login_dialog()
+        extend_rest_client()
 
         function create_login_dialog() {
             var login_dialog = $("<div>").attr("id", "login-dialog")
@@ -60,7 +58,7 @@ function dm3_accesscontrol() {
                     })
                 })
                 //
-                login(username)
+                self.login(username)
             } else {
                 show_message("Login failed", "login-failed")
             }
@@ -71,13 +69,22 @@ function dm3_accesscontrol() {
                 $(this).text(message).removeClass().addClass(css_class).fadeIn(1000, fn)
             })
         }
+
+        function extend_rest_client() {
+            dm3c.restc.set_owner = function(topic_id, user_id) {
+                return this.request("POST", "/accesscontrol/topic/" + topic_id + "/owner/" + user_id)
+            }
+            dm3c.restc.create_acl_entry = function(topic_id, role, permissions) {
+                return this.request("POST", "/accesscontrol/acl/" + topic_id, {role: role, permissions: permissions})
+            }
+        }
     }
 
     this.handle_special_command = function(label) {
         if (label == "Login...") {
             $("#login-dialog").dialog("open")
         } else if (label == "Logout \"" + get_username() + "\"") {
-            logout()
+            this.logout()
         }
     }
 
@@ -93,24 +100,80 @@ function dm3_accesscontrol() {
 
 
 
-    // ----------------------------------------------------------------------------------------------- Private Functions
+    // ******************
+    // *** Public API ***
+    // ******************
 
-    function login(username) {
+
+
+    this.create_user = function(username, password) {
+        var properties = {
+            "de/deepamehta/core/property/username": username,
+            "de/deepamehta/core/property/password": encrypt_password(password)
+        }
+        return dm3c.create_topic("de/deepamehta/core/topictype/user", properties)
+    }
+
+    // ---
+
+    this.set_owner = function(topic_id, user_id) {
+        dm3c.restc.set_owner(topic_id, user_id)
+    }
+
+    this.create_acl_entry = function(topic_id, role, permissions) {
+        dm3c.restc.create_acl_entry(topic_id, role, permissions)
+    }
+
+    // ---
+
+    this.login = function(username) {
         js.set_cookie("dm3_username", username)
-        dm3c.ui.set_menu_item_label("special-menu", "loginout-item", "Logout \"" + get_username() + "\"")
         //
+        refresh_menu_item()
         adjust_create_widget()
         //
         dm3c.trigger_hook("user_logged_in")
     }
 
-    function logout() {
+    this.logout = function() {
         js.remove_cookie("dm3_username")
-        dm3c.ui.set_menu_item_label("special-menu", "loginout-item", "Login...")
         //
+        refresh_menu_item()
         adjust_create_widget()
         //
         dm3c.trigger_hook("user_logged_out")
+    }
+
+
+
+    // ----------------------------------------------------------------------------------------------- Private Functions
+
+    function lookup_user(username, password) {
+        var user = dm3c.restc.get_topic_by_property("de/deepamehta/core/property/username", username)
+        if (user && user.properties["de/deepamehta/core/property/password"] == encrypt_password(password)) {
+            return user
+        }
+    }
+
+    /**
+     * Returns the username of the logged in user, or null/undefined if no user is logged in.
+     */
+    function get_username() {
+        return js.get_cookie("dm3_username")
+    }
+
+    function encrypt_password(password) {
+        return ENCRYPTED_PASSWORD_PREFIX + SHA256(password)
+    }
+
+    // ---
+
+    function refresh_menu_item() {
+        dm3c.ui.set_menu_item_label("special-menu", "loginout-item", menu_item_label())
+    }
+
+    function menu_item_label() {
+        return get_username() ? "Logout \"" + get_username() + "\"" : "Login..."
     }
 
     // ---
@@ -123,22 +186,5 @@ function dm3_accesscontrol() {
         } else {
             $("#create-widget").hide()
         }
-    }
-
-    // ---
-
-    function lookup_user(username, password) {
-        var user = dm3c.restc.get_topic_by_property("de/deepamehta/core/property/username", username)
-        if (user && user.properties["de/deepamehta/core/property/password"] == encrypt_password(password)) {
-            return user
-        }
-    }
-
-    function get_username() {
-        return js.get_cookie("dm3_username")
-    }
-
-    function encrypt_password(password) {
-        return ENCRYPTED_PASSWORD_PREFIX + SHA256(password)
     }
 }

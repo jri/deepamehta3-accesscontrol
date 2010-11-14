@@ -1,5 +1,7 @@
 package de.deepamehta.plugins.accesscontrol;
 
+import de.deepamehta.plugins.accesscontrol.model.Permissions;
+
 import de.deepamehta.core.model.DataField;
 import de.deepamehta.core.model.RelatedTopic;
 import de.deepamehta.core.model.Relation;
@@ -7,6 +9,11 @@ import de.deepamehta.core.model.Topic;
 import de.deepamehta.core.model.TopicType;
 import de.deepamehta.core.service.Plugin;
 import de.deepamehta.core.util.JavaUtils;
+import de.deepamehta.core.util.JSONHelper;
+
+import org.codehaus.jettison.json.JSONArray;
+import org.codehaus.jettison.json.JSONException;
+import org.codehaus.jettison.json.JSONObject;
 
 import static java.util.Arrays.asList;
 import java.util.HashMap;
@@ -26,7 +33,7 @@ public class AccessControlPlugin extends Plugin {
 
     public enum Role {
 
-        CREATOR, EVERYONE;
+        CREATOR, OWNER, EVERYONE;
         
         private String s() {
             return name().toLowerCase();
@@ -37,19 +44,19 @@ public class AccessControlPlugin extends Plugin {
         }
     }
 
-    private enum Permission {
+    public enum Permission {
 
         WRITE, CREATE;
 
-        private String s() {
+        public String s() {
             return this.name().toLowerCase();
         }
     }
 
-    private static final Map creatorACL = new HashMap();
+    private static final Permissions creatorACL = new Permissions();
     static {
-        creatorACL.put(Permission.WRITE.s(), true);
-        creatorACL.put(Permission.CREATE.s(), true);
+        creatorACL.add(Permission.WRITE, true);
+        creatorACL.add(Permission.CREATE, true);
     }
 
     private Logger logger = Logger.getLogger(getClass().getName());
@@ -66,7 +73,7 @@ public class AccessControlPlugin extends Plugin {
 
     @Override
     public void postInstallPluginHook() {
-        createDefaultUser();
+        createUser(DEFAULT_USER, DEFAULT_PASSWORD);
     }
 
     // Note: we must use the postCreateHook to create the relation because at pre_create the document has no ID yet.
@@ -79,7 +86,7 @@ public class AccessControlPlugin extends Plugin {
         }*/
         //
         setCreator(topic, clientContext);
-        createACLEntry(topic.id, Role.CREATOR);
+        createACLEntry(topic.id, Role.CREATOR, creatorACL);
     }
 
     @Override
@@ -97,9 +104,10 @@ public class AccessControlPlugin extends Plugin {
     @Override
     public void modifyTopicTypeHook(TopicType topicType, Map<String, String> clientContext) {
         addCreatorFieldToType(topicType);
+        addOwnerFieldToType(topicType);
         //
         setCreator(topicType, clientContext);
-        createACLEntry(topicType.id, Role.CREATOR);
+        createACLEntry(topicType.id, Role.CREATOR, creatorACL);
     }
 
     // ---
@@ -147,19 +155,23 @@ public class AccessControlPlugin extends Plugin {
 
 
 
-    public void createACLEntry(long topicId, Role role) {
-        dms.createRelation("ACCESS_CONTROL", topicId, getRoleTopic(role).id, creatorACL);
+    public void setOwner(long topicId, long userId) {
+        dms.createRelation("OWNER", topicId, userId, null);
+    }
+
+    public void createACLEntry(long topicId, Role role, Permissions permissions) {
+        dms.createRelation("ACCESS_CONTROL", topicId, getRoleTopic(role).id, permissions);
     }
 
 
 
     // ------------------------------------------------------------------------------------------------- Private Methods
 
-    private void createDefaultUser() {
+    private Topic createUser(String username, String password) {
         Map properties = new HashMap();
-        properties.put("de/deepamehta/core/property/username", DEFAULT_USER);
-        properties.put("de/deepamehta/core/property/password", encryptPassword(DEFAULT_PASSWORD));
-        dms.createTopic("de/deepamehta/core/topictype/user", properties, null);     // clientContext=null
+        properties.put("de/deepamehta/core/property/username", username);
+        properties.put("de/deepamehta/core/property/password", encryptPassword(password));
+        return dms.createTopic("de/deepamehta/core/topictype/user", properties, null);     // clientContext=null
     }
 
     // ---
@@ -210,6 +222,15 @@ public class AccessControlPlugin extends Plugin {
         topicType.addDataField(creatorField);
     }
 
+    private void addOwnerFieldToType(TopicType topicType) {
+        DataField ownerField = new DataField("Owner", "reference");
+        ownerField.setUri("de/deepamehta/core/property/owner");
+        ownerField.setRelatedTypeUri("de/deepamehta/core/topictype/user");
+        ownerField.setEditor("checkboxes");
+        //
+        topicType.addDataField(ownerField);
+    }
+
     // ---
 
     private void setCreator(Topic topic, Map<String, String> clientContext) {
@@ -246,24 +267,16 @@ public class AccessControlPlugin extends Plugin {
                 Role role = Role.valueOf(roleName.toUpperCase());   // throws IllegalArgumentException
                 logger.fine("There is an ACL entry for role " + role);
                 if (role.equals(Role.EVERYONE)) {
-                    boolean perm = (Boolean) relTopic.getRelation().getProperty(permission.s());
-                    logger.fine("value=" + perm);
-                    if (perm) {
-                        // everyone has permission
-                        logger.fine("=> ALLOWED");
+                    if (checkEveryone(relTopic, permission)) {
+                        return true;
+                    }
+                } else if (role.equals(Role.OWNER)) {
+                    if (checkOwner(topic, user, relTopic, permission)) {
                         return true;
                     }
                 } else if (role.equals(Role.CREATOR)) {
-                    boolean perm = (Boolean) relTopic.getRelation().getProperty(permission.s());
-                    logger.fine("value=" + perm);
-                    if (perm) {
-                        // the creator has permission -- check if the user is the creator
-                        Topic creator = getCreator(topic.id);
-                        logger.fine("The creator is " + creator);
-                        if (user != null && creator != null && user.id == creator.id) {
-                            logger.fine("=> ALLOWED");
-                            return true;
-                        }
+                    if (checkCreator(topic, user, relTopic, permission)) {
+                        return true;
                     }
                 } else {
                     throw new RuntimeException("Role \"" + role + "\" not yet handled");
@@ -276,6 +289,47 @@ public class AccessControlPlugin extends Plugin {
         }
     }
 
+    private boolean checkEveryone(RelatedTopic relTopic, Permission permission) {
+        boolean perm = (Boolean) relTopic.getRelation().getProperty(permission.s());
+        logger.fine("value=" + perm);
+        if (perm) {
+            // everyone has permission
+            logger.fine("=> ALLOWED");
+            return true;
+        }
+        return false;
+    }
+
+    private boolean checkOwner(Topic topic, Topic user, RelatedTopic relTopic, Permission permission) {
+        boolean perm = (Boolean) relTopic.getRelation().getProperty(permission.s());
+        logger.fine("value=" + perm);
+        if (perm) {
+            // the owner has permission -- check if the user is the owner
+            Topic owner = getOwner(topic.id);
+            logger.fine("The owner is " + owner);
+            if (user != null && owner != null && user.id == owner.id) {
+                logger.fine("=> ALLOWED");
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean checkCreator(Topic topic, Topic user, RelatedTopic relTopic, Permission permission) {
+        boolean perm = (Boolean) relTopic.getRelation().getProperty(permission.s());
+        logger.fine("value=" + perm);
+        if (perm) {
+            // the creator has permission -- check if the user is the creator
+            Topic creator = getCreator(topic.id);
+            logger.fine("The creator is " + creator);
+            if (user != null && creator != null && user.id == creator.id) {
+                logger.fine("=> ALLOWED");
+                return true;
+            }
+        }
+        return false;
+    }
+
     // ---
 
     private List<RelatedTopic> getACLEntries(long topicId) {
@@ -284,18 +338,35 @@ public class AccessControlPlugin extends Plugin {
             asList("ACCESS_CONTROL;INCOMING"), null);
     }
 
+    // ---
+
     /**
-     * Returns the creator (a user topic) of a topic, or <code>null</code> if no creator exists.
+     * Returns the topic's creator (a user topic), or <code>null</code> if no creator is set.
      */
     private Topic getCreator(long topicId) {
-        List<RelatedTopic> users = dms.getRelatedTopics(topicId,
-            asList("de/deepamehta/core/topictype/user"),
+        List<RelatedTopic> users = dms.getRelatedTopics(topicId, asList("de/deepamehta/core/topictype/user"),
             asList("CREATOR;INCOMING"), null);
         //
         if (users.size() == 0) {
             return null;
         } else if (users.size() > 1) {
             throw new RuntimeException("Ambiguity: topic " + topicId + " has " + users.size() + " creators");
+        }
+        //
+        return users.get(0).getTopic();
+    }
+
+    /**
+     * Returns the topic's owner (a user topic), or <code>null</code> if no owner is set.
+     */
+    private Topic getOwner(long topicId) {
+        List<RelatedTopic> users = dms.getRelatedTopics(topicId, asList("de/deepamehta/core/topictype/user"),
+            asList("OWNER;INCOMING"), null);
+        //
+        if (users.size() == 0) {
+            return null;
+        } else if (users.size() > 1) {
+            throw new RuntimeException("Ambiguity: topic " + topicId + " has " + users.size() + " owners");
         }
         //
         return users.get(0).getTopic();
