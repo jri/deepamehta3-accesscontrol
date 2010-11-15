@@ -53,10 +53,10 @@ public class AccessControlPlugin extends Plugin {
         }
     }
 
-    private static final Permissions creatorACL = new Permissions();
+    private static final Permissions DEFAULT_CREATOR_PERMISSIONS = new Permissions();
     static {
-        creatorACL.add(Permission.WRITE, true);
-        creatorACL.add(Permission.CREATE, true);
+        DEFAULT_CREATOR_PERMISSIONS.add(Permission.WRITE, true);
+        DEFAULT_CREATOR_PERMISSIONS.add(Permission.CREATE, true);
     }
 
     private Logger logger = Logger.getLogger(getClass().getName());
@@ -86,7 +86,7 @@ public class AccessControlPlugin extends Plugin {
         }*/
         //
         setCreator(topic, clientContext);
-        createACLEntry(topic.id, Role.CREATOR, creatorACL);
+        createACLEntry(topic.id, Role.CREATOR, DEFAULT_CREATOR_PERMISSIONS);
     }
 
     @Override
@@ -107,7 +107,7 @@ public class AccessControlPlugin extends Plugin {
         addOwnerFieldToType(topicType);
         //
         setCreator(topicType, clientContext);
-        createACLEntry(topicType.id, Role.CREATOR, creatorACL);
+        createACLEntry(topicType.id, Role.CREATOR, DEFAULT_CREATOR_PERMISSIONS);
     }
 
     // ---
@@ -216,7 +216,8 @@ public class AccessControlPlugin extends Plugin {
     private void addCreatorFieldToType(TopicType topicType) {
         DataField creatorField = new DataField("Creator", "reference");
         creatorField.setUri("de/deepamehta/core/property/creator");
-        creatorField.setRelatedTypeUri("de/deepamehta/core/topictype/user");
+        creatorField.setRefTopicTypeUri("de/deepamehta/core/topictype/user");
+        creatorField.setRefRelationTypeId("CREATOR");
         creatorField.setEditor("checkboxes");
         //
         topicType.addDataField(creatorField);
@@ -225,7 +226,8 @@ public class AccessControlPlugin extends Plugin {
     private void addOwnerFieldToType(TopicType topicType) {
         DataField ownerField = new DataField("Owner", "reference");
         ownerField.setUri("de/deepamehta/core/property/owner");
-        ownerField.setRelatedTypeUri("de/deepamehta/core/topictype/user");
+        ownerField.setRefTopicTypeUri("de/deepamehta/core/topictype/user");
+        ownerField.setRefRelationTypeId("OWNER");
         ownerField.setEditor("checkboxes");
         //
         topicType.addDataField(ownerField);
