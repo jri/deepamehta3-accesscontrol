@@ -14,7 +14,7 @@ function accesscontrol_plugin() {
 
 
     // *******************************
-    // *** Overriding Plugin Hooks ***
+    // *** Overriding Client Hooks ***
     // *******************************
 
 
@@ -100,6 +100,24 @@ function accesscontrol_plugin() {
 
 
 
+    // ***************************************
+    // *** Overriding Access Control Hooks ***
+    // ***************************************
+
+
+
+    this.user_logged_in = function() {
+        refresh_menu_item()
+        dm3c.render_topic()
+    }
+
+    this.user_logged_out = function() {
+        refresh_menu_item()
+        dm3c.render_topic()
+    }
+
+
+
     // ******************
     // *** Public API ***
     // ******************
@@ -129,7 +147,6 @@ function accesscontrol_plugin() {
     this.login = function(username) {
         js.set_cookie("dm3_username", username)
         //
-        refresh_menu_item()
         adjust_create_widget()
         //
         dm3c.trigger_hook("user_logged_in")
@@ -138,7 +155,6 @@ function accesscontrol_plugin() {
     this.logout = function() {
         js.remove_cookie("dm3_username")
         //
-        refresh_menu_item()
         adjust_create_widget()
         //
         dm3c.trigger_hook("user_logged_out")
