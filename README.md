@@ -1,81 +1,79 @@
 
-DeepaMehta 3 Access Control Plugin
-==================================
+DeepaMehta 3 Access Control
+===========================
 
-Restricts access to DeepaMehta 3 by putting a login dialog at application start.
-Accounts can be created and modified by the user. One account is pre-configured.
+This plugin adds access control to DeepaMehta 3: configurable access privilegs by the means of users, groups, roles, and access control lists (ACLs). Access control might be an issue with shared DeepaMehta installations.
 
-Note: there is no access control mechanism with individual permissions yet.
-This plugin just restricts a DeepaMehta 3 installation to a set of well-known users.
-Each user, once logged in, has access to everything.
+DeepaMehta 3 is a platform for collaboration and knowledge management.  
+<http://github.com/jri/deepamehta3>
 
 
-Requirements
-------------
+Installing
+----------
 
-* A DeepaMehta 3 installation  
-  <http://github.com/jri/deepamehta3>
+The DeepaMehta 3 Access Control plugin is typically installed while the DeepaMehta 3 standard installation.  
+See link above.
 
+**WARNING:** This plugin is in early state and not yet ready for production use. That's why it is installed but *deactivated* by default. Do *not* activate the plugin on a DeepaMehta 3 installation that holds your real content. Although you would not loose any data your installation might not properly upgrade to later versions of the DeepaMehta 3 Access Control plugin.
 
-Installation
-------------
+Activate the DeepaMehta 3 Access Control plugin via the Apache Felix shell (the terminal window that opens while starting DeepaMehta):
+
+1. Find out the bundle ID of the DeepaMehta 3 Access Control plugin by using the `lb` command (list bundles):
+
+        lb
+
+   You will find the DeepaMehta 3 Access Control plugin and its bundle ID (it is supposed to be 39 or something like that) in the displayed list of bundles:
+
+        ID|State      |Level|Name
+        ..|..         |..   |..
+        39|Resolved   |    1|DeepaMehta 3 Access Control (0.4.0)
+
+   The *Resolved* state means the plugin is not yet activated.
+
+2. Activate the DeepaMehta 3 Access Control plugin by using the `start` command:
+
+        start 39 
+
+   While the DeepaMehta 3 Access Control plugin starts you'll see some information logged.
+
+   Now, when using the `lb` command again you see the DeepaMehta 3 Access Control plugin in *Active* state:
+
+        39|Active     |    1|DeepaMehta 3 Access Control (0.4.0)
+
+3. Stop DeepaMehta and start it again (as described in its [README](http://github.com/jri/deepamehta3)).  
+   Sorry for this extra step!
+
+4. You're done. The DeepaMehta browser window opens automatically.
 
 
 Usage
 -----
 
-1.  Visit DeepaMehta 3 in your webbrowser (resp. press reload):
-        http://localhost:5984/deepamehta3-db/_design/deepamehta3/index.html
-    A login dialog will appear.
+* Login via the *Special* menu.  
+  Initially one user exists: *admin* without possword.
 
-2.  Login as *admin*. Leave the *Password* field empty.
+* Simple access privilegs are pre-configured:
+  * To create or edit any content you must login.
+  * A guest user can search/view everything but can't create or edit anything.
+  * An user can edit only the topics she has created.
 
-### Create another account ###
+  For the moment the access privilegs are not configurable by the user.
 
-1.  Accounts are ordinary DeepaMehta 3 topics. You'll find an additional topic type *Account*
-    in the type menu (next to the *Create* button). Create an account.
+* Create a new user by choosing *User* from the type menu and pressing the *Create* button.  
 
-2.  Fill in the *Username* and *Password* fields and click *Save*. The new account is active from now on.
-    (To test it return to the login dialog by pressing the browser's *Reload* button.)
+* Modify an user (e.g. change its password) by revealing the user topic and pressing the *Edit* button.
 
-### Modify an account ###
-
-1.  Search for the account (e.g. by fulltext or time search) and reveal it.
-
-2.  Click the *Edit* button and make your changes, e.g. change the password, and click *Save*.
-
-
-Updating
---------
-
-1.  Go to your DeepaMehta 3 installation directory:
-        cd deepamehta3
-
-2.  Update DeepaMehta 3 Accounts Plugin:
-        couchapp vendor update dm3-accounts
-
-3.  Copy additional stuff:
-        cp -r vendor/dm3-accounts/views/dm3-accounts views
-
-4.  Upload changes to CouchDB:
-        couchapp push http://localhost:5984/deepamehta3-db
+* Logout via the *Special* menu.
 
 
 Version History
 ---------------
 
-**v0.3** -- Mar 6, 2010
+**v0.4** -- Nov 25, 2010
 
-* Topic type "Account" got an icon
-* Account "Notes" is a rich text field
-* Compatible with DeepaMehta 3 v0.3
-
-**v0.2** -- Dec 1, 2009
-
-* Basic functionality
-* Requires DeepaMehta 3 v0.2
+* Compatible with DeepaMehta 3 v0.4.3
 
 
 ------------
 Jörg Richter  
-Mar 6, 2009
+Nov 25, 2009
