@@ -32,7 +32,7 @@ Activate the DeepaMehta 3 Access Control plugin via the Apache Felix shell (the 
 
 2. Activate the DeepaMehta 3 Access Control plugin by using the `start` command:
 
-        start 39 
+        start 39
 
    While the DeepaMehta 3 Access Control plugin starts you'll see some information logged.
 
@@ -50,7 +50,7 @@ Usage
 -----
 
 * Login via the *Special* menu.  
-  Initially one user exists: *admin* without possword.
+  Initially one user exists: *admin* without password.
 
 * Simple access privilegs are pre-configured:
   * To create or edit any content you must login.

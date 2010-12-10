@@ -59,4 +59,10 @@ public class AccessControlResource {
         Permissions permissions = new Permissions(aclEntry.getJSONObject("permissions"));
         accessControl.createACLEntry(topicId, role, permissions);
     }
+
+    @POST
+    @Path("/user/{userId}/{workspaceId}")
+    public void joinWorkspace(@PathParam("userId") long userId, @PathParam("workspaceId") long workspaceId) {
+        accessControl.joinWorkspace(workspaceId, userId);
+    }
 }

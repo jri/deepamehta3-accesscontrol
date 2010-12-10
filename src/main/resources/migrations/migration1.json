@@ -51,6 +51,12 @@
         {
             type_uri: "de/deepamehta/core/topictype/role",
             properties: {
+                "de/deepamehta/core/property/rolename": "member"
+            }
+        },
+        {
+            type_uri: "de/deepamehta/core/topictype/role",
+            properties: {
                 "de/deepamehta/core/property/rolename": "everyone"
             }
         }

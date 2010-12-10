@@ -77,6 +77,9 @@ function accesscontrol_plugin() {
             dm3c.restc.create_acl_entry = function(topic_id, role, permissions) {
                 return this.request("POST", "/accesscontrol/acl/" + topic_id, {role: role, permissions: permissions})
             }
+            dm3c.restc.join_workspace = function(workspace_id, user_id) {
+                return this.request("POST", "/accesscontrol/user/" + user_id + "/" + workspace_id)
+            }
         }
     }
 
@@ -140,6 +143,10 @@ function accesscontrol_plugin() {
 
     this.create_acl_entry = function(topic_id, role, permissions) {
         dm3c.restc.create_acl_entry(topic_id, role, permissions)
+    }
+
+    this.join_workspace = function(workspace_id, user_id) {
+        dm3c.restc.join_workspace(workspace_id, user_id)
     }
 
     // ---

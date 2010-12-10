@@ -1,6 +1,7 @@
 package de.deepamehta.plugins.accesscontrol;
 
 import de.deepamehta.plugins.accesscontrol.model.Permissions;
+import de.deepamehta.plugins.workspaces.WorkspacesPlugin;
 
 import de.deepamehta.core.model.DataField;
 import de.deepamehta.core.model.RelatedTopic;
@@ -29,11 +30,17 @@ public class AccessControlPlugin extends Plugin {
     private static final String DEFAULT_PASSWORD = "";
     private static final String ENCRYPTED_PASSWORD_PREFIX = "-SHA256-";  // don't change this
 
+    private static enum RelationType {
+        OWNER,              // Owner of a topic.      Direction is from topic to user.
+        ACCESS_CONTROL,     // ACL of a topic.        Direction is from topic to role.
+        WORKSPACE_MEMBER    // Member of a workspace. Direction is from workspace to user.
+    }
+
     // ---------------------------------------------------------------------------------------------- Instance Variables
 
     public enum Role {
 
-        CREATOR, OWNER, EVERYONE;
+        CREATOR, OWNER, MEMBER, EVERYONE;
         
         private String s() {
             return name().toLowerCase();
@@ -49,7 +56,7 @@ public class AccessControlPlugin extends Plugin {
         WRITE, CREATE;
 
         public String s() {
-            return this.name().toLowerCase();
+            return name().toLowerCase();
         }
     }
 
@@ -122,7 +129,7 @@ public class AccessControlPlugin extends Plugin {
 
     @Override
     public void providePropertiesHook(Relation relation) {
-        if (relation.typeId.equals("ACCESS_CONTROL")) {
+        if (relation.typeId.equals(RelationType.ACCESS_CONTROL.name())) {
             // transfer all relation properties
             Map properties = dms.getRelation(relation.id).getProperties();
             relation.setProperties(properties);
@@ -156,11 +163,17 @@ public class AccessControlPlugin extends Plugin {
 
 
     public void setOwner(long topicId, long userId) {
-        dms.createRelation("OWNER", topicId, userId, null);
+        dms.createRelation(RelationType.OWNER.name(), topicId, userId, null);
     }
 
     public void createACLEntry(long topicId, Role role, Permissions permissions) {
-        dms.createRelation("ACCESS_CONTROL", topicId, getRoleTopic(role).id, permissions);
+        dms.createRelation(RelationType.ACCESS_CONTROL.name(), topicId, getRoleTopic(role).id, permissions);
+    }
+
+    // ---
+
+    public void joinWorkspace(long workspaceId, long userId) {
+        dms.createRelation(RelationType.WORKSPACE_MEMBER.name(), workspaceId, userId, null);    // properties=null
     }
 
 
@@ -260,28 +273,22 @@ public class AccessControlPlugin extends Plugin {
 
     // ---
 
+    /**
+     * Returns true if the user has a permission for a topic.
+     */
     private boolean hasPermission(Topic topic, Topic user, Permission permission) {
         String roleName = null;
         try {
-            logger.fine("Determine permission of user " + user + " to " + permission + " " + topic);
+            logger.fine("Determining permission of user " + user + " to " + permission + " " + topic);
             for (RelatedTopic relTopic : getACLEntries(topic.id)) {
                 roleName = (String) relTopic.getTopic().getProperty("de/deepamehta/core/property/rolename");
                 Role role = Role.valueOf(roleName.toUpperCase());   // throws IllegalArgumentException
                 logger.fine("There is an ACL entry for role " + role);
-                if (role.equals(Role.EVERYONE)) {
-                    if (checkEveryone(relTopic, permission)) {
-                        return true;
-                    }
-                } else if (role.equals(Role.OWNER)) {
-                    if (checkOwner(topic, user, relTopic, permission)) {
-                        return true;
-                    }
-                } else if (role.equals(Role.CREATOR)) {
-                    if (checkCreator(topic, user, relTopic, permission)) {
-                        return true;
-                    }
-                } else {
-                    throw new RuntimeException("Role \"" + role + "\" not yet handled");
+                boolean allowedForRole = (Boolean) relTopic.getRelation().getProperty(permission.s());
+                logger.fine("value=" + allowedForRole);
+                if (allowedForRole && userOccupiesRole(topic, user, role)) {
+                    logger.fine("=> ALLOWED");
+                    return true;
                 }
             }
             logger.fine("=> DENIED");
@@ -291,53 +298,86 @@ public class AccessControlPlugin extends Plugin {
         }
     }
 
-    private boolean checkEveryone(RelatedTopic relTopic, Permission permission) {
-        boolean perm = (Boolean) relTopic.getRelation().getProperty(permission.s());
-        logger.fine("value=" + perm);
-        if (perm) {
-            // everyone has permission
-            logger.fine("=> ALLOWED");
+    private boolean userOccupiesRole(Topic topic, Topic user, Role role) {
+        //
+        if (role.equals(Role.EVERYONE)) {
             return true;
         }
-        return false;
-    }
-
-    private boolean checkOwner(Topic topic, Topic user, RelatedTopic relTopic, Permission permission) {
-        boolean perm = (Boolean) relTopic.getRelation().getProperty(permission.s());
-        logger.fine("value=" + perm);
-        if (perm) {
-            // the owner has permission -- check if the user is the owner
-            Topic owner = getOwner(topic.id);
-            logger.fine("The owner is " + owner);
-            if (user != null && owner != null && user.id == owner.id) {
-                logger.fine("=> ALLOWED");
-                return true;
-            }
+        //
+        if (user == null) {
+            return false;
         }
-        return false;
-    }
-
-    private boolean checkCreator(Topic topic, Topic user, RelatedTopic relTopic, Permission permission) {
-        boolean perm = (Boolean) relTopic.getRelation().getProperty(permission.s());
-        logger.fine("value=" + perm);
-        if (perm) {
-            // the creator has permission -- check if the user is the creator
-            Topic creator = getCreator(topic.id);
-            logger.fine("The creator is " + creator);
-            if (user != null && creator != null && user.id == creator.id) {
-                logger.fine("=> ALLOWED");
+        //
+        if (role.equals(Role.MEMBER)) {
+            if (userIsMember(user, topic)) {
                 return true;
             }
+        } else if (role.equals(Role.OWNER)) {
+            if (userIsOwner(user, topic)) {
+                return true;
+            }
+        } else if (role.equals(Role.CREATOR)) {
+            if (userIsCreator(user, topic)) {
+                return true;
+            }
+        } else {
+            throw new RuntimeException("Role \"" + role + "\" not yet handled");
         }
         return false;
     }
 
     // ---
 
+    /**
+     * Returns true if the user is a member of a workspace the topic type is assigned to.
+     *
+     * FIXME: for the moment only implemented for types, not for regular topics.
+     *
+     * @param   topic   actually a topic type.
+     */
+    private boolean userIsMember(Topic user, Topic topic) {
+        WorkspacesPlugin workspaces = (WorkspacesPlugin) dms.getPlugin("de.deepamehta.3-workspaces");
+        String typeUri = (String) topic.getProperty("de/deepamehta/core/property/TypeURI");
+        // String typeUri = topic.typeUri;
+        //
+        List<RelatedTopic> relTopics = workspaces.getWorkspaces(topic.id);
+        logger.fine("Topic type " + typeUri + " is assigned to " + relTopics.size() + " workspaces");
+        for (RelatedTopic relTopic : relTopics) {
+            long workspaceId = relTopic.getTopic().id;
+            if (isMemberOfWorkspace(user.id, workspaceId)) {
+                logger.fine("User " + user + " IS member of workspace " + relTopic.getTopic());
+                return true;
+            } else {
+                logger.fine("User " + user + " is NOT member of workspace " + relTopic.getTopic());
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Returns true if the user is the owner of the topic.
+     */
+    private boolean userIsOwner(Topic user, Topic topic) {
+        Topic owner = getOwner(topic.id);
+        logger.fine("The owner is " + owner);
+        return owner != null && user.id == owner.id;
+    }
+
+    /**
+     * Returns true if the user is the creator of the topic.
+     */
+    private boolean userIsCreator(Topic user, Topic topic) {
+        Topic creator = getCreator(topic.id);
+        logger.fine("The creator is " + creator);
+        return creator != null && user.id == creator.id;
+    }
+
+    // ---
+
     private List<RelatedTopic> getACLEntries(long topicId) {
-        return getService().getRelatedTopics(topicId,
+        return dms.getRelatedTopics(topicId,
             asList("de/deepamehta/core/topictype/role"),
-            asList("ACCESS_CONTROL;INCOMING"), null);
+            asList(RelationType.ACCESS_CONTROL.name() + ";INCOMING"), null);
     }
 
     // ---
@@ -372,5 +412,9 @@ public class AccessControlPlugin extends Plugin {
         }
         //
         return users.get(0).getTopic();
+    }
+
+    private boolean isMemberOfWorkspace(long userId, long workspaceId) {
+        return dms.getRelation(workspaceId, userId, RelationType.WORKSPACE_MEMBER.name(), true) != null;
     }
 }
