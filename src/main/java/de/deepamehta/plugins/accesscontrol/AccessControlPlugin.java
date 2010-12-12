@@ -31,7 +31,8 @@ public class AccessControlPlugin extends Plugin {
     private static final String ENCRYPTED_PASSWORD_PREFIX = "-SHA256-";  // don't change this
 
     private static enum RelationType {
-        OWNER,              // Owner of a topic.      Direction is from topic to user.
+        TOPIC_CREATOR,      // Creator of a topic.    Direction is from topic to user.
+        TOPIC_OWNER,        // Owner of a topic.      Direction is from topic to user.
         ACCESS_CONTROL,     // ACL of a topic.        Direction is from topic to role.
         WORKSPACE_MEMBER    // Member of a workspace. Direction is from workspace to user.
     }
@@ -162,8 +163,38 @@ public class AccessControlPlugin extends Plugin {
 
 
 
+    /**
+     * Returns the user that is represented by the client context, or <code>null</code> if no user is logged in.
+     */
+    public Topic getUser(Map<String, String> clientContext) {
+        if (clientContext == null) {    // some callers to dms.getTopic() doesn't pass a client context
+            return null;
+        }
+        String username = clientContext.get("dm3_username");
+        if (username == null) {
+            return null;
+        }
+        return getUser(username);
+    }
+
+    public Topic getTopicByOwner(long userId, String typeUri) {
+        List<RelatedTopic> topics = dms.getRelatedTopics(userId, asList(typeUri),
+            asList(RelationType.TOPIC_OWNER.name() + ";OUTGOING"), null);
+        //
+        if (topics.size() == 0) {
+            return null;
+        } else if (topics.size() > 1) {
+            throw new RuntimeException("Ambiguity: owner " + userId + " has " +
+                topics.size() + " " + typeUri + " topics");
+        }
+        //
+        return topics.get(0).getTopic();
+    }
+
+    // ---
+
     public void setOwner(long topicId, long userId) {
-        dms.createRelation(RelationType.OWNER.name(), topicId, userId, null);
+        dms.createRelation(RelationType.TOPIC_OWNER.name(), topicId, userId, null);
     }
 
     public void createACLEntry(long topicId, Role role, Permissions permissions) {
@@ -188,20 +219,6 @@ public class AccessControlPlugin extends Plugin {
     }
 
     // ---
-
-    /**
-     * Returns the user that is represented by the client context, or <code>null</code> if no user is logged in.
-     */
-    private Topic getUser(Map<String, String> clientContext) {
-        if (clientContext == null) {    // some callers to dms.getTopic() doesn't pass a client context
-            return null;
-        }
-        String username = clientContext.get("dm3_username");
-        if (username == null) {
-            return null;
-        }
-        return getUser(username);
-    }
 
     /**
      * Returns the user (topic) by username, or <code>null</code> if no such user exists.
@@ -230,7 +247,7 @@ public class AccessControlPlugin extends Plugin {
         DataField creatorField = new DataField("Creator", "reference");
         creatorField.setUri("de/deepamehta/core/property/creator");
         creatorField.setRefTopicTypeUri("de/deepamehta/core/topictype/user");
-        creatorField.setRefRelationTypeId("CREATOR");
+        creatorField.setRefRelationTypeId(RelationType.TOPIC_CREATOR.name());
         creatorField.setEditor("checkboxes");
         //
         topicType.addDataField(creatorField);
@@ -240,7 +257,7 @@ public class AccessControlPlugin extends Plugin {
         DataField ownerField = new DataField("Owner", "reference");
         ownerField.setUri("de/deepamehta/core/property/owner");
         ownerField.setRefTopicTypeUri("de/deepamehta/core/topictype/user");
-        ownerField.setRefRelationTypeId("OWNER");
+        ownerField.setRefRelationTypeId(RelationType.TOPIC_OWNER.name());
         ownerField.setEditor("checkboxes");
         //
         topicType.addDataField(ownerField);
@@ -258,7 +275,7 @@ public class AccessControlPlugin extends Plugin {
     }
 
     private void setCreator(long topicId, long userId) {
-        dms.createRelation("CREATOR", topicId, userId, null);
+        dms.createRelation(RelationType.TOPIC_CREATOR.name(), topicId, userId, null);
     }
 
     // === ACL Entries ===
@@ -387,7 +404,7 @@ public class AccessControlPlugin extends Plugin {
      */
     private Topic getCreator(long topicId) {
         List<RelatedTopic> users = dms.getRelatedTopics(topicId, asList("de/deepamehta/core/topictype/user"),
-            asList("CREATOR;INCOMING"), null);
+            asList(RelationType.TOPIC_CREATOR.name() + ";INCOMING"), null);
         //
         if (users.size() == 0) {
             return null;
@@ -403,7 +420,7 @@ public class AccessControlPlugin extends Plugin {
      */
     private Topic getOwner(long topicId) {
         List<RelatedTopic> users = dms.getRelatedTopics(topicId, asList("de/deepamehta/core/topictype/user"),
-            asList("OWNER;INCOMING"), null);
+            asList(RelationType.TOPIC_OWNER.name() + ";INCOMING"), null);
         //
         if (users.size() == 0) {
             return null;

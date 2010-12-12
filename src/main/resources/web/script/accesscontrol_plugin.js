@@ -13,9 +13,9 @@ function accesscontrol_plugin() {
 
 
 
-    // *******************************
-    // *** Overriding Client Hooks ***
-    // *******************************
+    // ******************************************************
+    // *** Client Hooks (triggered by deepamehta3-client) ***
+    // ******************************************************
 
 
 
@@ -46,21 +46,22 @@ function accesscontrol_plugin() {
         function do_login() {
             var username = $("#login-username").val()
             var password = $("#login-password").val()
-            var logged_in_user = lookup_user(username, password)
-            if (logged_in_user) {
-                show_message("Login OK", "login-ok", function() {
-                    $("#login-dialog").parent().fadeOut(400, function() {
-                        $("#login-dialog").dialog("close")
-                        // clear fields for possible re-open
-                        $("#login-username").val("")
-                        $("#login-password").val("")
-                        $("#login-message").text("")
-                    })
-                })
-                //
-                self.login(username)
+            var user = lookup_user(username, password)
+            if (user) {
+                show_message("Login OK", "login-ok", close_login_dialog)
+                self.login(user)
             } else {
                 show_message("Login failed", "login-failed")
+            }
+
+            function close_login_dialog() {
+                $("#login-dialog").parent().fadeOut(400, function() {
+                    $("#login-dialog").dialog("close")
+                    // clear fields for possible re-open
+                    $("#login-username").val("")
+                    $("#login-password").val("")
+                    $("#login-message").text("")
+                })
             }
         }
 
@@ -71,6 +72,12 @@ function accesscontrol_plugin() {
         }
 
         function extend_rest_client() {
+            dm3c.restc.get_user = function() {
+                return this.request("GET", "/accesscontrol/user")
+            }
+            dm3c.restc.get_topic_by_owner = function(user_id, type_uri) {
+                return this.request("GET", "/accesscontrol/owner/" + user_id + "/" + encodeURIComponent(type_uri))
+            }
             dm3c.restc.set_owner = function(topic_id, user_id) {
                 return this.request("POST", "/accesscontrol/topic/" + topic_id + "/owner/" + user_id)
             }
@@ -103,13 +110,13 @@ function accesscontrol_plugin() {
 
 
 
-    // ***************************************
-    // *** Overriding Access Control Hooks ***
-    // ***************************************
+    // *********************************************************************
+    // *** Access Control Hooks (triggered by deepamehta3-accesscontrol) ***
+    // *********************************************************************
 
 
 
-    this.user_logged_in = function() {
+    this.user_logged_in = function(user) {
         refresh_menu_item()
         dm3c.render_topic()
     }
@@ -137,6 +144,14 @@ function accesscontrol_plugin() {
 
     // ---
 
+    this.get_user = function() {
+        return dm3c.restc.get_user()
+    }
+
+    this.get_topic_by_owner = function(user_id, type_uri) {
+        return dm3c.restc.get_topic_by_owner(user_id, type_uri)
+    }
+
     this.set_owner = function(topic_id, user_id) {
         dm3c.restc.set_owner(topic_id, user_id)
     }
@@ -151,12 +166,13 @@ function accesscontrol_plugin() {
 
     // ---
 
-    this.login = function(username) {
+    this.login = function(user) {
+        var username = user.properties["de/deepamehta/core/property/username"]
         js.set_cookie("dm3_username", username)
         //
         adjust_create_widget()
         //
-        dm3c.trigger_hook("user_logged_in")
+        dm3c.trigger_hook("user_logged_in", user)
     }
 
     this.logout = function() {

@@ -46,6 +46,20 @@ public class AccessControlResource {
 
     private Logger logger = Logger.getLogger(getClass().getName());
 
+    @GET
+    @Path("/user")
+    public JSONObject getUser(@HeaderParam("Cookie") String cookie) {
+        Map clientContext = JSONHelper.cookieToMap(cookie);
+        logger.info("### cookie: " + clientContext);
+        return accessControl.getUser(clientContext).toJSON();
+    }
+
+    @GET
+    @Path("/owner/{userId}/{typeUri}")
+    public JSONObject getTopicByOwner(@PathParam("userId") long userId, @PathParam("typeUri") String typeUri) {
+        return accessControl.getTopicByOwner(userId, typeUri).toJSON();
+    }
+
     @POST
     @Path("/topic/{topicId}/owner/{userId}")
     public void setOwner(@PathParam("topicId") long topicId, @PathParam("userId") long userId) {
