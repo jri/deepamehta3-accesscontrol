@@ -22,6 +22,7 @@
         {
             label: "Role",
             uri: "de/deepamehta/core/topictype/role",
+            icon_src: "/de.deepamehta.3-accesscontrol/images/silhouette.gif",
             js_renderer_class: "PlainDocument",
             fields: [
                 {

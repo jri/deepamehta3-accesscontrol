@@ -26,7 +26,7 @@ Activate the DeepaMehta 3 Access Control plugin via the Apache Felix shell (the 
 
         ID|State      |Level|Name
         ..|..         |..   |..
-        39|Resolved   |    1|DeepaMehta 3 Access Control (0.4.0)
+        39|Resolved   |    1|DeepaMehta 3 Access Control (0.4.1)
 
    The *Resolved* state means the plugin is not yet activated.
 
@@ -38,7 +38,7 @@ Activate the DeepaMehta 3 Access Control plugin via the Apache Felix shell (the 
 
    Now, when using the `lb` command again you see the DeepaMehta 3 Access Control plugin in *Active* state:
 
-        39|Active     |    1|DeepaMehta 3 Access Control (0.4.0)
+        39|Active     |    1|DeepaMehta 3 Access Control (0.4.1)
 
 3. Stop DeepaMehta and start it again (as described in its [README](http://github.com/jri/deepamehta3)).  
    Sorry for this extra step!
@@ -69,11 +69,19 @@ Usage
 Version History
 ---------------
 
+**v0.4.1** -- Jan 3, 2011
+
+* New role: MEMBER.
+* Extended service API.
+* Compatible with DeepaMehta 3 v0.4.4
+
 **v0.4** -- Nov 25, 2010
 
+* 3 roles: CREATOR, OWNER, EVERYONE.
+* 2 permissions: WRITE, CREATE.
 * Compatible with DeepaMehta 3 v0.4.3
 
 
 ------------
 Jörg Richter  
-Nov 25, 2009
+Jan 3, 2011

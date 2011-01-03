@@ -268,7 +268,7 @@ public class AccessControlPlugin extends Plugin {
     private void setCreator(Topic topic, Map<String, String> clientContext) {
         Topic user = getUser(clientContext);
         if (user == null) {
-            logger.warning("### There is no current user. The admin user is set as the creator of " + topic);
+            logger.warning("No user is logged in. \"admin\" is set as the creator of " + topic);
             user = getAdminUser();
         }
         setCreator(topic.id, user.id);

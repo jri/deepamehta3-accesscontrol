@@ -50,7 +50,7 @@ public class AccessControlResource {
     @Path("/user")
     public JSONObject getUser(@HeaderParam("Cookie") String cookie) {
         Map clientContext = JSONHelper.cookieToMap(cookie);
-        logger.info("### cookie: " + clientContext);
+        logger.info("Cookie: " + clientContext);
         return accessControl.getUser(clientContext).toJSON();
     }
 
